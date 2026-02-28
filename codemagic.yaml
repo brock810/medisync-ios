@@ -36,6 +36,9 @@ workflows:
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             -archivePath /Users/builder/clone/build/App.xcarchive \
+            DEVELOPMENT_TEAM=L5GY5W76NG \
+            CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates \
             archive
 
       # ✅ Export an IPA (needed for TestFlight/App Store upload)
