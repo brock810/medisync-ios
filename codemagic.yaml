@@ -7,6 +7,11 @@ workflows:
     environment:
       node: latest
 
+      # ✅ Tell Codemagic to pull/install signing assets for this workflow
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.quantumwebdynamics.medisynclabs
+
     scripts:
       - name: Install dependencies
         script: |
@@ -22,7 +27,6 @@ workflows:
           pod install
           cd ../..
 
-      # This builds an .ipa when code signing is configured in Codemagic UI
       - name: Build Archive (Xcode)
         script: |
           xcodebuild \
@@ -32,11 +36,40 @@ workflows:
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             -archivePath /Users/builder/clone/build/App.xcarchive \
-            DEVELOPMENT_TEAM=L5GY5W76NG \
-            CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="medisync_appstore_profile" \
             archive
+
+      # ✅ Export an IPA (needed for TestFlight/App Store upload)
+      - name: Export IPA
+        script: |
+          cat > /Users/builder/clone/exportOptions.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>L5GY5W76NG</string>
+            <key>compileBitcode</key>
+            <false/>
+            <key>stripSwiftSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          PLIST
+
+          mkdir -p /Users/builder/clone/build/export
+
+          xcodebuild -exportArchive \
+            -archivePath /Users/builder/clone/build/App.xcarchive \
+            -exportPath /Users/builder/clone/build/export \
+            -exportOptionsPlist /Users/builder/clone/exportOptions.plist \
+            -allowProvisioningUpdates
+
     artifacts:
-      - build/**/*.xcarchive
+      - /Users/builder/clone/build/export/*.ipa
+      - /Users/builder/clone/build/*.xcarchive
       - ios/App/build/**/*.log
       - $HOME/Library/Logs/DiagnosticReports/**/*.crash
