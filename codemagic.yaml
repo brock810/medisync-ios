@@ -38,21 +38,34 @@ workflows:
             security cms -D -i "$f" | /usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /dev/stdin
           done || true
 
-      - name: Build Archive (Xcode)
+      - name: Install Development provisioning profile
         script: |
-          # ⚠️ After the previous step prints UUID, paste it here:
-          PROFILE_UUID="PASTE_UUID_HERE"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+
+          DEV_PROFILE="/Users/builder/clone/MediSync_Dev_Profile.mobileprovision"
+
+          cp "$DEV_PROFILE" "$HOME/Library/MobileDevice/Provisioning Profiles/"
+
+          PROFILE_UUID=$(security cms -D -i "$DEV_PROFILE" | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin)
+          echo "PROFILE_UUID=$PROFILE_UUID" | tee /tmp/profile_uuid.env
+
+          echo "Installed profiles:"
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles"
+
+      - name: Build (Dev signing)
+        script: |
+          source /tmp/profile_uuid.env
 
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
-            -configuration Release \
+            -configuration Debug \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            -archivePath /Users/builder/clone/build/App.xcarchive \
+            -archivePath /Users/builder/clone/build/AppDev.xcarchive \
             DEVELOPMENT_TEAM=L5GY5W76NG \
             CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_IDENTITY="Apple Development" \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             archive
 
