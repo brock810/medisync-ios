@@ -32,6 +32,7 @@ workflows:
             -archivePath $CM_BUILD_DIR/build/App.xcarchive \
             DEVELOPMENT_TEAM=L5GY5W76NG \
             CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates \
             archive
 
     artifacts:
