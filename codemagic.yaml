@@ -4,14 +4,13 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
 
-    integrations:
-      app_store_connect: Medisync
-
     environment:
       node: latest
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.quantumwebdynamics.medisynclabs
+      groups:
+        - ios_signing
 
     scripts:
       - name: Install dependencies
@@ -28,8 +27,22 @@ workflows:
           pod install
           cd ../..
 
+      - name: List installed provisioning profiles
+        script: |
+          echo "=== Provisioning profiles on builder ==="
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
+          for f in "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision; do
+            echo "---- $f"
+            security cms -D -i "$f" | /usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin
+            security cms -D -i "$f" | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin
+            security cms -D -i "$f" | /usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /dev/stdin
+          done || true
+
       - name: Build Archive (Xcode)
         script: |
+          # ⚠️ After the previous step prints UUID, paste it here:
+          PROFILE_UUID="PASTE_UUID_HERE"
+
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
@@ -38,42 +51,12 @@ workflows:
             -destination "generic/platform=iOS" \
             -archivePath /Users/builder/clone/build/App.xcarchive \
             DEVELOPMENT_TEAM=L5GY5W76NG \
-            CODE_SIGN_STYLE=Automatic \
-            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
             archive
 
-      # ✅ Export an IPA (needed for TestFlight/App Store upload)
-      - name: Export IPA
-        script: |
-          cat > /Users/builder/clone/exportOptions.plist <<'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>teamID</key>
-            <string>L5GY5W76NG</string>
-            <key>compileBitcode</key>
-            <false/>
-            <key>stripSwiftSymbols</key>
-            <true/>
-          </dict>
-          </plist>
-          PLIST
-
-          mkdir -p /Users/builder/clone/build/export
-
-          xcodebuild -exportArchive \
-            -archivePath /Users/builder/clone/build/App.xcarchive \
-            -exportPath /Users/builder/clone/build/export \
-            -exportOptionsPlist /Users/builder/clone/exportOptions.plist \
-            -allowProvisioningUpdates
-
     artifacts:
-      - /Users/builder/clone/build/export/*.ipa
       - /Users/builder/clone/build/*.xcarchive
       - ios/App/build/**/*.log
       - $HOME/Library/Logs/DiagnosticReports/**/*.crash
