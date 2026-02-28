@@ -1,0 +1,38 @@
+workflows:
+  ios-release:
+    name: iOS Release (Capacitor)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      node: latest
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+
+      - name: Capacitor sync iOS
+        script: |
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        script: |
+          cd ios/App
+          pod install
+          cd ../..
+
+      # This builds an .ipa when code signing is configured in Codemagic UI
+      - name: Build IPA (Xcode)
+        script: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
+            archive
+
+    artifacts:
+      - build/**/*.xcarchive
+      - ios/App/build/**/*.log
+      - $HOME/Library/Logs/DiagnosticReports/**/*.crash
