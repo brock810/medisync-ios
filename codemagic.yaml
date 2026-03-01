@@ -16,8 +16,8 @@ workflows:
       vars:
         TEAM_ID: "L5GY5W76NG"
         BUNDLE_ID: "com.quantumwebdynamics.medisynclabs.dev"
-        WORKSPACE: "ios/App/App.xcworkspace"
         PROJECT: "ios/App/App.xcodeproj"
+        WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
         CONFIGURATION: "Release"
 
@@ -110,7 +110,7 @@ workflows:
           echo "Installed provisioning profiles:"
           ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
 
-      - name: Build IPA with Codemagic CLI
+      - name: Build signed IPA
         script: |
           set -euo pipefail
           xcode-project build-ipa \
@@ -125,5 +125,7 @@ workflows:
 
     publishing:
       app_store_connect:
-        auth: integration
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         submit_to_testflight: true
