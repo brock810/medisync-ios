@@ -11,7 +11,7 @@ workflows:
 
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.quantumwebdynamics.medisynclabs
+        bundle_identifier: com.quantumwebdynamics.medisynclabs.dev
 
       vars:
         WORKSPACE: "ios/App/App.xcworkspace"
