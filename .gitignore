@@ -3,3 +3,7 @@ ios/App/Pods/
 ios/App/build/
 *.log
 .DS_Store
+*.p8
+*.p12
+*.mobileprovision
+authkey_base64.txt
