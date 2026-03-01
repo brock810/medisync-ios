@@ -189,10 +189,6 @@ workflows:
             -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            PROVISIONING_PROFILE="$PROFILE_UUID" \
             archive
 
       - name: Export IPA
@@ -211,16 +207,7 @@ workflows:
             <string>${TEAM_ID}</string>
 
             <key>signingStyle</key>
-            <string>manual</string>
-
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
-
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>${BUNDLE_ID}</key>
-              <string>${PROFILE_NAME}</string>
-            </dict>
+            <string>automatic</string>
 
             <key>compileBitcode</key>
             <false/>
@@ -234,7 +221,8 @@ workflows:
           xcodebuild -exportArchive \
             -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
             -exportOptionsPlist "$CM_BUILD_DIR/ExportOptions.plist" \
-            -exportPath "$CM_BUILD_DIR/build/ipa"
+            -exportPath "$CM_BUILD_DIR/build/ipa" \
+            -allowProvisioningUpdates
 
           echo "Exported files:"
           ls -la "$CM_BUILD_DIR/build/ipa" || true
