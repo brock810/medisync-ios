@@ -148,7 +148,6 @@ workflows:
           echo "Exported files:"
           ls -la "$CM_BUILD_DIR/build/ipa" || true
 
-      # ✅ FIX: Upload to TestFlight manually (bypasses APP_STORE_CONNECT_PUBLISHER_PRIVATE_KEY)
       - name: Upload to TestFlight (manual)
         script: |
           set -euo pipefail
@@ -166,13 +165,25 @@ workflows:
             exit 1
           fi
 
+          echo "Sanity check key header:"
+          head -n 2 "$KEY_PATH" || true
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
+            echo "Key file does not look like PEM. Dumping first 5 lines:"
+            sed -n '1,5p' "$KEY_PATH" || true
+            exit 1
+          fi
+
+          # IMPORTANT: app-store-connect expects PEM via @env:... (not a file path)
+          export APP_STORE_CONNECT_PUBLISHER_PRIVATE_KEY="$(cat "$KEY_PATH")"
+
           echo "Uploading IPA to TestFlight..."
           app-store-connect publish \
             --path "$IPA_PATH" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --private-key "$KEY_PATH" \
-            --testflight
+            --private-key @env:APP_STORE_CONNECT_PUBLISHER_PRIVATE_KEY \
+            --testflight \
+            --platform IOS
 
     artifacts:
       - build/ipa/*.ipa
