@@ -110,25 +110,53 @@ workflows:
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           ls -la "$PROFILES_DIR" || true
 
-          # Find a profile that contains your DEV bundle id
-          PROFILE_FILE="$(grep -RIl "${BUNDLE_ID}" "$PROFILES_DIR"/*.mobileprovision | head -n 1 || true)"
+          pick=""
+          for f in "$PROFILES_DIR"/*.mobileprovision; do
+            echo "---- Checking: $f"
+            plist="$(/usr/bin/security cms -D -i "$f")"
 
-          if [ -z "${PROFILE_FILE:-}" ] || [ ! -f "$PROFILE_FILE" ]; then
-            echo "❌ Could not find a provisioning profile matching bundle id: ${BUNDLE_ID}"
-            echo "Available profiles:"
-            ls -la "$PROFILES_DIR" || true
+            # Pull app identifier (TEAMID.bundleid)
+            app_id="$(echo "$plist" | /usr/bin/plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)"
+            name="$(echo "$plist" | /usr/bin/plutil -extract Name raw -o - - 2>/dev/null || true)"
+            uuid="$(echo "$plist" | /usr/bin/plutil -extract UUID raw -o - - 2>/dev/null || true)"
+
+            echo "Name: ${name}"
+            echo "UUID: ${uuid}"
+            echo "AppID: ${app_id}"
+
+            # Match either exact bundle or wildcard
+            if echo "$app_id" | grep -q "\.${BUNDLE_ID}$"; then
+              pick="$f"
+              PROFILE_NAME="$name"
+              PROFILE_UUID="$uuid"
+              echo "✅ MATCH (exact)"
+              break
+            fi
+
+            # Sometimes app_id is TEAMID.com.xxx (BUNDLE_ID already includes com.xxx)
+            if echo "$app_id" | grep -q "${BUNDLE_ID}$"; then
+              pick="$f"
+              PROFILE_NAME="$name"
+              PROFILE_UUID="$uuid"
+              echo "✅ MATCH"
+              break
+            fi
+
+            # Wildcard profiles look like TEAMID.*
+            if echo "$app_id" | grep -q "\.\*$"; then
+              echo "⚠️ Wildcard profile found (not ideal): $name"
+            fi
+          done
+
+          if [ -z "${pick:-}" ]; then
+            echo "❌ No provisioning profile matched ${BUNDLE_ID}."
+            echo "That means Codemagic did NOT install your DEV profile yet."
             exit 1
           fi
 
-          echo "✅ Using provisioning profile file: $PROFILE_FILE"
-
-          # Extract UUID and Name
-          PROFILE_UUID=$(/usr/bin/security cms -D -i "$PROFILE_FILE" | /usr/bin/plutil -extract UUID raw -o - -)
-          PROFILE_NAME=$(/usr/bin/security cms -D -i "$PROFILE_FILE" | /usr/bin/plutil -extract Name raw -o - -)
-
+          echo "✅ Using provisioning profile file: $pick"
           echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
           echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
-
           echo "Provisioning profile name: $PROFILE_NAME"
           echo "Provisioning profile UUID: $PROFILE_UUID"
 
