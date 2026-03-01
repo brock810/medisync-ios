@@ -182,6 +182,36 @@ workflows:
         script: |
           set -euo pipefail
 
+          echo "Finding provisioning profile for export for ${BUNDLE_ID}..."
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+
+          # Find the right profile by decoding (same logic as earlier)
+          PROFILE_FILE=""
+          for f in "$PROFILES_DIR"/*.mobileprovision; do
+            plist="$(/usr/bin/security cms -D -i "$f")"
+            app_id="$(echo "$plist" | /usr/bin/plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)"
+            name="$(echo "$plist" | /usr/bin/plutil -extract Name raw -o - - 2>/dev/null || true)"
+            uuid="$(echo "$plist" | /usr/bin/plutil -extract UUID raw -o - - 2>/dev/null || true)"
+
+            if echo "$app_id" | grep -q "${BUNDLE_ID}$"; then
+              PROFILE_FILE="$f"
+              PROFILE_NAME="$name"
+              PROFILE_UUID="$uuid"
+              break
+            fi
+          done
+
+          if [ -z "${PROFILE_FILE:-}" ]; then
+            echo "❌ Could not locate dev provisioning profile for ${BUNDLE_ID} in $PROFILES_DIR"
+            ls -la "$PROFILES_DIR" || true
+            exit 1
+          fi
+
+          echo "✅ Export will use profile:"
+          echo "   Name: $PROFILE_NAME"
+          echo "   UUID: $PROFILE_UUID"
+          echo "   File: $PROFILE_FILE"
+
           cat > "$CM_BUILD_DIR/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -194,7 +224,16 @@ workflows:
             <string>${TEAM_ID}</string>
 
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
+
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
 
             <key>compileBitcode</key>
             <false/>
@@ -205,7 +244,8 @@ workflows:
           xcodebuild -exportArchive \
             -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
             -exportOptionsPlist "$CM_BUILD_DIR/ExportOptions.plist" \
-            -exportPath "$CM_BUILD_DIR/build/ipa"
+            -exportPath "$CM_BUILD_DIR/build/ipa" \
+            -allowProvisioningUpdates
 
           echo "Exported files:"
           ls -la "$CM_BUILD_DIR/build/ipa" || true
