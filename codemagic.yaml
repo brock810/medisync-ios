@@ -182,22 +182,6 @@ workflows:
         script: |
           set -euo pipefail
 
-          # Find the installed profile name that Codemagic used
-          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          PROFILE_FILE="$(ls -1 "$PROFILES_DIR"/*.mobileprovision | head -n 1)"
-
-          if [ -z "${PROFILE_FILE:-}" ] || [ ! -f "$PROFILE_FILE" ]; then
-            echo "No provisioning profile file found in: $PROFILES_DIR"
-            ls -la "$PROFILES_DIR" || true
-            exit 1
-          fi
-
-          PROFILE_NAME=$(/usr/bin/security cms -D -i "$PROFILE_FILE" \
-            | /usr/bin/plutil -extract Name raw -o - -)
-
-          echo "Using export provisioning profile: $PROFILE_NAME"
-          echo "Profile file: $PROFILE_FILE"
-
           cat > "$CM_BUILD_DIR/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -210,16 +194,7 @@ workflows:
             <string>${TEAM_ID}</string>
 
             <key>signingStyle</key>
-            <string>manual</string>
-
-            <key>signingCertificate</key>
-            <string>Apple Distribution</string>
-
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>${BUNDLE_ID}</key>
-              <string>${PROFILE_NAME}</string>
-            </dict>
+            <string>automatic</string>
 
             <key>compileBitcode</key>
             <false/>
