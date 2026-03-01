@@ -73,24 +73,21 @@ workflows:
         script: |
           set -euo pipefail
           xcode-project use-profiles
+          echo "Installed provisioning profiles:"
           ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
 
-          if [ -z "$MATCH_FILE" ]; then
-            echo "❌ No installed provisioning profile matched bundle id $BUNDLE_ID"
-            echo "Dumping application-identifiers found:"
-            for f in "$PROFILES_DIR"/*.mobileprovision; do
-              APP_ID=$(/usr/bin/security cms -D -i "$f" \
-                | /usr/bin/plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)
-              echo "$(basename "$f") -> $APP_ID"
-            done
-            exit 1
-          fi
-
-          PROFILE_NAME=$(/usr/bin/security cms -D -i "$MATCH_FILE" \
-            | /usr/bin/plutil -extract Name raw -o - -)
-
-          echo "✅ Using provisioning profile name (specifier): $PROFILE_NAME"
-          echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
+      - name: Build archive
+        script: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            archive
 
       - name: Build archive
         script: |
