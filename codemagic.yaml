@@ -77,9 +77,10 @@ workflows:
           set -euo pipefail
           xcode-project use-profiles
 
-      - name: Build archive
+      - name: Build archive (App Store / Distribution)
         script: |
           set -euo pipefail
+
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -88,6 +89,10 @@ workflows:
             -destination "generic/platform=iOS" \
             -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="medisync_appstore_profile" \
             archive
 
       - name: Export IPA
@@ -101,11 +106,9 @@ workflows:
             <key>method</key>
             <string>app-store</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
             <key>teamID</key>
             <string>${TEAM_ID}</string>
-            <key>stripSwiftSymbols</key>
-            <true/>
             <key>compileBitcode</key>
             <false/>
           </dict>
