@@ -37,7 +37,30 @@ workflows:
         script: |
           npx cap sync ios
 
-      - name: Install CocoaPods
+      - name: Force bundle id in iOS native project
+        script: |
+          set -euo pipefail
+
+          echo "Forcing bundle id to: ${BUNDLE_ID}"
+
+          # 1) Force Info.plist bundle id (runtime)
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" ios/App/App/App/Info.plist || true
+
+          # 2) Force Xcode project bundle id (what signing actually uses)
+          PBX="ios/App/App.xcodeproj/project.pbxproj"
+          if [ -f "$PBX" ]; then
+            # Replace any existing PRODUCT_BUNDLE_IDENTIFIER
+            sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID};/g" "$PBX"
+          else
+            echo "Missing project.pbxproj at $PBX"
+            exit 1
+          fi
+
+          echo "Bundle IDs now set to:"
+          grep -n "PRODUCT_BUNDLE_IDENTIFIER" -n "$PBX" | head -n 20 || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" ios/App/App/App/Info.plist || true
+
+            - name: Install CocoaPods
         script: |
           cd ios/App
           pod install
@@ -89,6 +112,7 @@ workflows:
             -destination "generic/platform=iOS" \
             -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
             archive
 
       - name: Export IPA
