@@ -10,8 +10,7 @@ workflows:
         - ios_testflight
 
       vars:
-        # Safe defaults (these can be overridden by your variable group if you want)
-        WORKSPACE: "ios/App.xcworkspace"
+        WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
         CONFIGURATION: "Release"
 
@@ -41,8 +40,6 @@ workflows:
           cd ../..
 
       # ---- App Store Connect API Key (.p8) via base64 env var ----
-      # You MUST add this in your variable group as a Secret:
-      #   APP_STORE_CONNECT_API_KEY_BASE64 = <base64 of AuthKey_M798L583DA.p8>
       - name: Restore App Store Connect API key
         script: |
           set -euo pipefail
@@ -50,19 +47,29 @@ workflows:
             echo "Missing APP_STORE_CONNECT_API_KEY_BASE64 env var."
             exit 1
           fi
+
+          # macOS base64 uses -D; GNU uses --decode. Try both.
+          echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -D > "$CM_BUILD_DIR/AuthKey_M798L583DA.p8" 2>/dev/null || \
           echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > "$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
+
           ls -la "$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
 
-      # Optional: quick sanity checks so failures are obvious
       - name: Verify Xcode workspace and schemes
         script: |
           set -euo pipefail
-          if [ ! -f "$WORKSPACE" ]; then
-            echo "Workspace not found at: $WORKSPACE"
-            echo "Listing ios/App:"
-            ls -la ios/App || true
+
+          echo "WORKSPACE=$WORKSPACE"
+          echo "Listing ios:"
+          ls -la ios || true
+          echo "Listing ios/App:"
+          ls -la ios/App || true
+
+          # .xcworkspace is a DIRECTORY, not a file
+          if [ ! -d "$WORKSPACE" ]; then
+            echo "Workspace not found (dir) at: $WORKSPACE"
             exit 1
           fi
+
           xcodebuild -list -workspace "$WORKSPACE"
 
       - name: Build archive
