@@ -1,12 +1,12 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.quantumwebdynamics.medisynclabs.dev', 
-  appName: 'MediSyncLabs DEV',
+  appId: 'com.quantumwebdynamics.medisynclabs',
+  appName: 'MediSyncLabs',
   webDir: 'dist',
   server: {
-    url: 'http://192.168.1.127:8056',  
-    cleartext: true
+    url: 'https://www.medisynclabs.ca/ios',
+    cleartext: false
   }
 };
 
