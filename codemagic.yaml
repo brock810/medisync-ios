@@ -14,6 +14,7 @@ workflows:
         bundle_identifier: com.quantumwebdynamics.medisynclabs.dev
 
       vars:
+        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs.dev"
         WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
         CONFIGURATION: "Release"
@@ -43,13 +44,10 @@ workflows:
 
           echo "Forcing bundle id to: ${BUNDLE_ID}"
 
-          # 1) Force Info.plist bundle id (runtime)
           /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" ios/App/App/App/Info.plist || true
 
-          # 2) Force Xcode project bundle id (what signing actually uses)
           PBX="ios/App/App.xcodeproj/project.pbxproj"
           if [ -f "$PBX" ]; then
-            # Replace any existing PRODUCT_BUNDLE_IDENTIFIER
             sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID};/g" "$PBX"
           else
             echo "Missing project.pbxproj at $PBX"
@@ -57,16 +55,15 @@ workflows:
           fi
 
           echo "Bundle IDs now set to:"
-          grep -n "PRODUCT_BUNDLE_IDENTIFIER" -n "$PBX" | head -n 20 || true
+          grep -n "PRODUCT_BUNDLE_IDENTIFIER" "$PBX" | head -n 20 || true
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" ios/App/App/App/Info.plist || true
 
-            - name: Install CocoaPods
+      - name: Install CocoaPods
         script: |
           cd ios/App
           pod install
           cd ../..
 
-      # ---- App Store Connect API Key (.p8) via base64 env var ----
       - name: Restore App Store Connect API key
         script: |
           set -euo pipefail
@@ -75,20 +72,17 @@ workflows:
             exit 1
           fi
 
-          # macOS base64 uses -D; GNU uses --decode. Try both.
           echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -D > "$CM_BUILD_DIR/AuthKey_M798L583DA.p8" 2>/dev/null || \
           echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > "$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
 
           ls -la "$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
-          echo "Key header:"
           head -n 1 "$CM_BUILD_DIR/AuthKey_M798L583DA.p8" || true
 
       - name: Verify Xcode workspace and schemes
         script: |
           set -euo pipefail
           if [ ! -d "$WORKSPACE" ]; then
-            echo "Workspace not found (dir) at: $WORKSPACE"
-            echo "Listing ios/App:"
+            echo "Workspace not found at: $WORKSPACE"
             ls -la ios/App || true
             exit 1
           fi
@@ -111,11 +105,13 @@ workflows:
           ls -la "$PROFILES_DIR" || true
 
           pick=""
+          PROFILE_NAME=""
+          PROFILE_UUID=""
+
           for f in "$PROFILES_DIR"/*.mobileprovision; do
             echo "---- Checking: $f"
             plist="$(/usr/bin/security cms -D -i "$f")"
 
-            # Pull app identifier (TEAMID.bundleid)
             app_id="$(echo "$plist" | /usr/bin/plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)"
             name="$(echo "$plist" | /usr/bin/plutil -extract Name raw -o - - 2>/dev/null || true)"
             uuid="$(echo "$plist" | /usr/bin/plutil -extract UUID raw -o - - 2>/dev/null || true)"
@@ -124,7 +120,6 @@ workflows:
             echo "UUID: ${uuid}"
             echo "AppID: ${app_id}"
 
-            # Match either exact bundle or wildcard
             if echo "$app_id" | grep -q "\.${BUNDLE_ID}$"; then
               pick="$f"
               PROFILE_NAME="$name"
@@ -133,7 +128,6 @@ workflows:
               break
             fi
 
-            # Sometimes app_id is TEAMID.com.xxx (BUNDLE_ID already includes com.xxx)
             if echo "$app_id" | grep -q "${BUNDLE_ID}$"; then
               pick="$f"
               PROFILE_NAME="$name"
@@ -141,16 +135,10 @@ workflows:
               echo "✅ MATCH"
               break
             fi
-
-            # Wildcard profiles look like TEAMID.*
-            if echo "$app_id" | grep -q "\.\*$"; then
-              echo "⚠️ Wildcard profile found (not ideal): $name"
-            fi
           done
 
           if [ -z "${pick:-}" ]; then
             echo "❌ No provisioning profile matched ${BUNDLE_ID}."
-            echo "That means Codemagic did NOT install your DEV profile yet."
             exit 1
           fi
 
@@ -199,11 +187,20 @@ workflows:
             <key>signingCertificate</key>
             <string>Apple Distribution</string>
 
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${PROFILE_NAME}</string>
+            </dict>
+
             <key>compileBitcode</key>
             <false/>
           </dict>
           </plist>
           EOF
+
+          echo "===== ExportOptions.plist ====="
+          cat "$CM_BUILD_DIR/ExportOptions.plist"
 
           xcodebuild -exportArchive \
             -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
@@ -230,18 +227,15 @@ workflows:
             exit 1
           fi
 
-          echo "Sanity check key header:"
           head -n 2 "$KEY_PATH" || true
           if ! grep -q "BEGIN PRIVATE KEY" "$KEY_PATH"; then
-            echo "Key file does not look like PEM. Dumping first 5 lines:"
+            echo "Key file does not look like PEM."
             sed -n '1,5p' "$KEY_PATH" || true
             exit 1
           fi
 
-          # IMPORTANT: app-store-connect expects PEM via @env:... (not a file path)
           export APP_STORE_CONNECT_PUBLISHER_PRIVATE_KEY="$(cat "$KEY_PATH")"
 
-          echo "Uploading IPA to TestFlight..."
           app-store-connect publish \
             --path "$IPA_PATH" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
