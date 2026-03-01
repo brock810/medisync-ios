@@ -64,6 +64,35 @@ workflows:
           pod install
           cd ../..
 
+      - name: Disable signing for Pods/framework targets
+        script: |
+          set -euo pipefail
+
+          ruby <<'RUBY'
+          pbxproj = "ios/App/Pods/Pods.xcodeproj/project.pbxproj"
+
+          unless File.exist?(pbxproj)
+            puts "Pods project not found at #{pbxproj}"
+            exit 1
+          end
+
+          text = File.read(pbxproj)
+
+          # Remove any provisioning profile settings from Pods targets
+          text.gsub!(/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/, 'PROVISIONING_PROFILE_SPECIFIER = "";')
+          text.gsub!(/PROVISIONING_PROFILE = [^;]*;/, 'PROVISIONING_PROFILE = "";')
+
+          # Ensure pods/frameworks are not trying to use manual signing
+          text.gsub!(/CODE_SIGN_STYLE = Manual;/, 'CODE_SIGN_STYLE = Automatic;')
+
+          File.write(pbxproj, text)
+
+          puts "Updated Pods signing settings."
+          RUBY
+
+          echo "Checking Pods project for leftover provisioning settings..."
+          grep -n "PROVISIONING_PROFILE" ios/App/Pods/Pods.xcodeproj/project.pbxproj || true
+
       - name: Restore App Store Connect API key
         script: |
           set -euo pipefail
