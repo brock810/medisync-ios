@@ -57,6 +57,8 @@ workflows:
           echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode > "$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
 
           ls -la "$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
+          echo "Key header:"
+          head -n 1 "$CM_BUILD_DIR/AuthKey_M798L583DA.p8" || true
 
       - name: Verify Xcode workspace and schemes
         script: |
@@ -75,19 +77,6 @@ workflows:
           xcode-project use-profiles
           echo "Installed provisioning profiles:"
           ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
-
-      - name: Build archive
-        script: |
-          set -euo pipefail
-          xcodebuild \
-            -workspace "$WORKSPACE" \
-            -scheme "$SCHEME" \
-            -configuration "$CONFIGURATION" \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            archive
 
       - name: Build archive
         script: |
@@ -156,14 +145,36 @@ workflows:
             -exportOptionsPlist "$CM_BUILD_DIR/ExportOptions.plist" \
             -exportPath "$CM_BUILD_DIR/build/ipa"
 
+          echo "Exported files:"
+          ls -la "$CM_BUILD_DIR/build/ipa" || true
+
+      # ✅ FIX: Upload to TestFlight manually (bypasses APP_STORE_CONNECT_PUBLISHER_PRIVATE_KEY)
+      - name: Upload to TestFlight (manual)
+        script: |
+          set -euo pipefail
+
+          IPA_PATH="$CM_BUILD_DIR/build/ipa/App.ipa"
+          if [ ! -f "$IPA_PATH" ]; then
+            echo "IPA not found at: $IPA_PATH"
+            ls -la "$CM_BUILD_DIR/build/ipa" || true
+            exit 1
+          fi
+
+          KEY_PATH="$CM_BUILD_DIR/AuthKey_M798L583DA.p8"
+          if [ ! -f "$KEY_PATH" ]; then
+            echo "Missing .p8 key at: $KEY_PATH"
+            exit 1
+          fi
+
+          echo "Uploading IPA to TestFlight..."
+          app-store-connect publish \
+            --path "$IPA_PATH" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --private-key "$KEY_PATH" \
+            --testflight
+
     artifacts:
       - build/ipa/*.ipa
       - $HOME/Library/Logs/**/*
       - $CM_BUILD_DIR/build/**/*.xcarchive
-
-    publishing:
-      app_store_connect:
-        api_key: $CM_BUILD_DIR/AuthKey_M798L583DA.p8
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
