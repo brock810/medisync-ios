@@ -9,6 +9,10 @@ workflows:
       groups:
         - ios_testflight
 
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.quantumwebdynamics.medisynclabs
+
       vars:
         WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
@@ -65,30 +69,11 @@ workflows:
           fi
           xcodebuild -list -workspace "$WORKSPACE"
 
-      - name: Apply Codemagic code signing profiles + detect App Store profile
+      - name: Apply Codemagic code signing profiles
         script: |
           set -euo pipefail
           xcode-project use-profiles
-
-          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          echo "Provisioning profiles dir: $PROFILES_DIR"
-          ls -la "$PROFILES_DIR" || true
-
-          echo "Searching for a profile that matches bundle id: $BUNDLE_ID"
-          MATCH_FILE=""
-
-          for f in "$PROFILES_DIR"/*.mobileprovision; do
-            # Extract the application-identifier from the profile
-            APP_ID=$(/usr/bin/security cms -D -i "$f" \
-              | /usr/bin/plutil -extract Entitlements.application-identifier raw -o - - 2>/dev/null || true)
-
-            if echo "$APP_ID" | grep -q "\.$BUNDLE_ID$"; then
-              MATCH_FILE="$f"
-              echo "Matched profile file: $MATCH_FILE"
-              echo "application-identifier: $APP_ID"
-              break
-            fi
-          done
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles" || true
 
           if [ -z "$MATCH_FILE" ]; then
             echo "❌ No installed provisioning profile matched bundle id $BUNDLE_ID"
@@ -107,11 +92,9 @@ workflows:
           echo "✅ Using provisioning profile name (specifier): $PROFILE_NAME"
           echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
 
-      - name: Build archive (force Apple Distribution + detected profile)
+      - name: Build archive
         script: |
           set -euo pipefail
-          echo "Using PROFILE_NAME=$PROFILE_NAME"
-
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -120,9 +103,6 @@ workflows:
             -destination "generic/platform=iOS" \
             -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             archive
 
       - name: Export IPA
