@@ -6,28 +6,31 @@ const config: CapacitorConfig = {
   webDir: 'dist',
 
   server: {
+    // ✅ App opens here first (inside the WebView)
+    url: 'http://192.168.1.127:8056/manual_entry',
     cleartext: true,
+
+    // ✅ Only origins/domains here (NOT paths)
     allowNavigation: [
-      '192.168.1.127/manual_entry',
-      'http://192.168.1.127:8056/manual_entry',
-      '192.168.1.127:8056/manual_entry',
-      '*.medisynclabs.ca',
-      'medisynclabs.ca',
-      'www.medisynclabs.ca',
+      'http://192.168.1.127',
+      'http://192.168.1.127:8056',
+      'https://medisynclabs.ca',
+      'https://www.medisynclabs.ca',
+      'https://*.medisynclabs.ca',
     ],
   },
 
   ios: {
-    backgroundColor: '#91bfff' // ✅ nicer than bright blue for that logo
+    backgroundColor: '#91bfff',
   },
 
   plugins: {
     SplashScreen: {
-      backgroundColor: '#80b5ff', // ✅ splash flash color
+      backgroundColor: '#80b5ff',
       launchAutoHide: true,
-      showSpinner: false
-    }
-  }
+      showSpinner: false,
+    },
+  },
 };
 
 export default config;
