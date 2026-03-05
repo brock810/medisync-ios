@@ -21,8 +21,6 @@ workflows:
         SCHEME: "App"
         CONFIGURATION: "Release"
         APP_STORE_APPLE_ID: "6759877855"
-
-        # Optional but helpful for CI paths
         ASSET_PATH: "./resources"
 
     scripts:
@@ -32,38 +30,82 @@ workflows:
           npm -v
           xcodebuild -version
 
-      - name: Install dependencies
-        script: |
-          npm ci
-
-      - name: Ensure TypeScript exists
-        script: |
-          npm ls typescript || npm i -D typescript
-
-      # ✅ Ensure IAP + splash asset tooling exists (safe if already in package.json)
-      - name: Ensure Capacitor assets + IAP deps exist
-        script: |
-          npm ls @capacitor/assets || npm i -D @capacitor/assets
-          npm ls @capacitor/splash-screen || npm i @capacitor/splash-screen
-          npm ls @capacitor-community/in-app-purchases || npm i @capacitor-community/in-app-purchases
-
-      # ✅ Generate native splash/icon assets from ./resources (logo loader)
-      # Expect:
-      #   ./resources/splash.png
-      #   ./resources/icon.png   (optional but recommended)
-      - name: Generate iOS splash/icon assets
+      - name: Install dependencies (locked, no npm token)
         script: |
           set -euo pipefail
+
+          # Ignore any expired/revoked npm token config in CI
+          export NPM_CONFIG_USERCONFIG=/dev/null
+          export NPM_CONFIG_FUND=false
+          export NPM_CONFIG_AUDIT=false
+
+          npm ci
+
+      - name: Verify required JS deps are present (fail fast)
+        script: |
+          set -euo pipefail
+
+          echo "Verifying required deps exist in node_modules (from package-lock)..."
+
+          # ---- IAP (choose ONE in your actual app; this workflow expects Capgo) ----
+          if ! npm ls @capgo/native-purchases >/dev/null 2>&1; then
+            echo ""
+            echo "❌ Missing @capgo/native-purchases"
+            echo "Fix: install locally and commit package-lock.json:"
+            echo "  npm i @capgo/native-purchases"
+            echo "  git add package.json package-lock.json && git commit -m \"Add IAP dep\" && git push"
+            echo ""
+            exit 1
+          fi
+
+          # ---- Assets tooling ----
+          if ! npm ls @capacitor/assets >/dev/null 2>&1; then
+            echo ""
+            echo "❌ Missing @capacitor/assets"
+            echo "Fix: npm i -D @capacitor/assets && commit package-lock.json"
+            echo ""
+            exit 1
+          fi
+
+          if ! npm ls @capacitor/splash-screen >/dev/null 2>&1; then
+            echo ""
+            echo "❌ Missing @capacitor/splash-screen"
+            echo "Fix: npm i @capacitor/splash-screen && commit package-lock.json"
+            echo ""
+            exit 1
+          fi
+
+          # ---- TypeScript check (no installs in CI) ----
+          if ! npm ls typescript >/dev/null 2>&1; then
+            echo ""
+            echo "❌ Missing typescript"
+            echo "Fix: npm i -D typescript && commit package-lock.json"
+            echo ""
+            exit 1
+          fi
+
+          echo "✅ All required deps found."
+
+      - name: Generate iOS splash/icon assets (logo loader)
+        script: |
+          set -euo pipefail
+
           if [ -d "${ASSET_PATH}" ]; then
             echo "Resources folder found at ${ASSET_PATH}"
             ls -la "${ASSET_PATH}" || true
-            npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
+
+            if [ -f "${ASSET_PATH}/splash.png" ]; then
+              npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
+            else
+              echo "No splash.png found in ${ASSET_PATH} (skipping asset generation)."
+            fi
           else
             echo "No ${ASSET_PATH} folder; skipping capacitor-assets generate."
           fi
 
       - name: Capacitor sync iOS
         script: |
+          set -euo pipefail
           npx cap sync ios
 
       - name: Force bundle id in iOS native project
@@ -88,6 +130,7 @@ workflows:
 
       - name: Install CocoaPods
         script: |
+          set -euo pipefail
           cd ios/App
           pod install
           cd ../..
