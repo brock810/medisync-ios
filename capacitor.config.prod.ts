@@ -6,7 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     url: 'https://www.medisynclabs.ca/ios',
-    cleartext: false
+    cleartext: false,
+    allowNavigation: ['www.medisynclabs.ca', 'medisynclabs.ca']
   }
 };
 
