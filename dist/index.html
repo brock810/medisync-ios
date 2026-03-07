@@ -306,28 +306,35 @@
     </div>
   </main>
 
-  <script>
-    // ======= DEV server base =======
-    const BASE = "http://192.168.1.127:8056";
+<script>
+  const BASE = "http://192.168.1.127:8056";
 
-    // Static assets from your Flask server (since dist can't use url_for)
-    document.getElementById("logoImg").src = `${BASE}/static/medisync-logo2.png`;
+  document.getElementById("logoImg").src = `${BASE}/static/medisync-logo2.png`;
 
-    // If user is already logged in, just send them to manual_entry.
-    // Your backend should redirect to login if not authenticated.
-    // This avoids needing cookie detection from capacitor://localhost.
-    (function autoEntry(){
-      // If you WANT them to always see this screen first, comment out the next line.
-      // window.location.replace(`${BASE}/manual_entry`);
-    })();
+  const form = document.getElementById("iosQuickSignupForm");
+  form.action = `${BASE}/signup`;
 
-    // Set form action + login link to your Flask routes
-    const form = document.getElementById("iosQuickSignupForm");
-    form.action = `${BASE}/signup`;
+  const loginLink = document.getElementById("loginLink");
+  loginLink.href = `${BASE}/login`;
 
-    const loginLink = document.getElementById("loginLink");
-    loginLink.href = `${BASE}/login`;
-  </script>
+  (async function autoEntry() {
+    try {
+      const res = await fetch(`${BASE}/auth_status`, {
+        credentials: 'include'
+      });
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+
+      if (data.logged_in) {
+        window.location.replace(`${BASE}/manual_entry`);
+      }
+    } catch (err) {
+      console.log('Auth check failed:', err);
+    }
+  })();
+</script>
 
   <!-- Keep your existing analytics + validation scripts below (unchanged) -->
   <script>
