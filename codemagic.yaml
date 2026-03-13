@@ -11,11 +11,11 @@ workflows:
 
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.quantumwebdynamics.medisynclabs.dev
+        bundle_identifier: com.quantumwebdynamics.medisynclabs
 
       vars:
         TEAM_ID: "L5GY5W76NG"
-        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs.dev"
+        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs"
         PROJECT: "ios/App/App.xcodeproj"
         WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
@@ -185,11 +185,11 @@ workflows:
 
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.quantumwebdynamics.medisynclabs.dev
+        bundle_identifier: com.quantumwebdynamics.medisynclabs
 
       vars:
         TEAM_ID: "L5GY5W76NG"
-        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs.dev"
+        BUNDLE_ID: "com.quantumwebdynamics.medisynclabs"
         PROJECT: "ios/App/App.xcodeproj"
         WORKSPACE: "ios/App/App.xcworkspace"
         SCHEME: "App"
