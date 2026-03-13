@@ -145,12 +145,19 @@ workflows:
           set -euo pipefail
           xcode-project use-profiles --project "$PROJECT"
 
-      - name: Increment iOS build number
+      - name: Set unique iOS build number
         script: |
           set -euo pipefail
           cd ios/App
-          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 1)
-          agvtool new-version -all $((LATEST_BUILD_NUMBER + 1))
+
+          UNIQUE_BUILD_NUMBER=$(date +%y%m%d%H%M)
+          echo "Using unique build number: $UNIQUE_BUILD_NUMBER"
+
+          agvtool new-version -all "$UNIQUE_BUILD_NUMBER"
+
+          echo "Verifying build number..."
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" App/App/Info.plist || true
+
           cd ../..
 
       - name: Build signed IPA
