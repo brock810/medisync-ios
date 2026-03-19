@@ -330,3 +330,120 @@ workflows:
 
     artifacts:
       - /tmp/xcodebuild_logs/*.log
+    
+  ios_app_preview_simulator:
+    name: iOS App Preview Simulator
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      xcode: latest
+      node: latest
+
+      vars:
+        PROJECT: "ios/App/App.xcodeproj"
+        WORKSPACE: "ios/App/App.xcworkspace"
+        SCHEME: "App"
+        CONFIGURATION: "Debug"
+        ASSET_PATH: "./resources"
+        DERIVED_DATA_PATH: "/Users/builder/clone/DerivedData"
+
+    scripts:
+      - name: Show versions
+        script: |
+          set -euo pipefail
+          node -v
+          npm -v
+          xcodebuild -version
+
+      - name: Install dependencies
+        script: |
+          set -euo pipefail
+          export NPM_CONFIG_USERCONFIG=/dev/null
+          export NPM_CONFIG_FUND=false
+          export NPM_CONFIG_AUDIT=false
+          npm ci
+
+      - name: Verify required JS deps
+        script: |
+          set -euo pipefail
+
+          if ! npm ls @capgo/native-purchases >/dev/null 2>&1; then
+            echo "❌ Missing @capgo/native-purchases"
+            exit 1
+          fi
+
+          if ! npm ls @capacitor/assets >/dev/null 2>&1; then
+            echo "❌ Missing @capacitor/assets"
+            exit 1
+          fi
+
+          if ! npm ls @capacitor/splash-screen >/dev/null 2>&1; then
+            echo "❌ Missing @capacitor/splash-screen"
+            exit 1
+          fi
+
+          if ! npm ls typescript >/dev/null 2>&1; then
+            echo "❌ Missing typescript"
+            exit 1
+          fi
+
+          echo "✅ Dependencies look good."
+
+      - name: Generate iOS splash/icon assets
+        script: |
+          set -euo pipefail
+
+          if [ -d "${ASSET_PATH}" ] && [ -f "${ASSET_PATH}/splash.png" ]; then
+            npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
+          else
+            echo "Skipping capacitor-assets generate."
+          fi
+
+      - name: Capacitor sync iOS
+        script: |
+          set -euo pipefail
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        script: |
+          set -euo pipefail
+          cd ios/App
+          pod install
+          cd ../..
+
+      - name: Verify Xcode workspace and schemes
+        script: |
+          set -euo pipefail
+
+          if [ ! -d "$WORKSPACE" ]; then
+            echo "Workspace not found at: $WORKSPACE"
+            ls -la ios/App || true
+            exit 1
+          fi
+
+          xcodebuild -list -workspace "$WORKSPACE"
+
+      - name: Build .app for iOS simulator
+        script: |
+          set -euo pipefail
+
+          rm -rf "$DERIVED_DATA_PATH"
+
+          xcodebuild clean build \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+          echo "Built simulator app(s):"
+          find "$DERIVED_DATA_PATH" -name "*.app" -maxdepth 6
+
+    artifacts:
+      - /Users/builder/clone/DerivedData/Build/Products/**/*.app
+      - /tmp/xcodebuild_logs/*.log
