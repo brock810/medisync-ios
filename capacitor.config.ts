@@ -8,8 +8,10 @@ const config: CapacitorConfig = {
   webDir: 'dist',
 
   server: {
-    cleartext: false,
+    url: 'http://192.168.1.127:8086',
+    cleartext: true,
     allowNavigation: [
+      '192.168.1.127',
       '*.medisynclabs.ca',
       'medisynclabs.ca',
       'www.medisynclabs.ca'
