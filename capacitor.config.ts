@@ -8,7 +8,6 @@ const config: CapacitorConfig = {
   webDir: 'dist',
 
   server: {
-    url: 'http://192.168.1.127:8086',
     cleartext: true,
     allowNavigation: [
       '192.168.1.127',
