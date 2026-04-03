@@ -86,6 +86,22 @@ workflows:
           set -euo pipefail
           npx cap sync ios
 
+      - name: Verify generated iOS assets exist
+        script: |
+          set -euo pipefail
+
+          echo "Checking generated iOS asset catalogs..."
+
+          find ios/App -path "*AppIcon.appiconset*" -type d | head
+          find ios/App -path "*Splash.imageset*" -type d | head || true
+
+          if ! find ios/App -path "*AppIcon.appiconset*" -type d | grep -q .; then
+            echo "❌ AppIcon.appiconset was not generated"
+            exit 1
+          fi
+
+          echo "✅ iOS icon assets found."
+
       - name: Force bundle id in iOS native project
         script: |
           set -euo pipefail
