@@ -69,16 +69,7 @@ workflows:
       - name: Generate iOS splash/icon assets (logo loader)
         script: |
           set -euo pipefail
-
-          if [ -d "${ASSET_PATH}" ]; then
-            if [ -f "${ASSET_PATH}/splash.png" ]; then
-              npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
-            else
-              echo "No splash.png found in ${ASSET_PATH} (skipping asset generation)."
-            fi
-          else
-            echo "No ${ASSET_PATH} folder; skipping capacitor-assets generate."
-          fi
+          echo "Temporarily skipping capacitor-assets generate to isolate Assets.xcassets archive failure."
 
       - name: Capacitor sync iOS
         script: |
@@ -159,6 +150,11 @@ workflows:
           /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" App/App/Info.plist || true
 
           cd ../..
+
+      - name: Clean Xcode derived data
+        script: |
+          set -euo pipefail
+          rm -rf ~/Library/Developer/Xcode/DerivedData
 
       - name: Build signed IPA
         script: |
