@@ -1,3 +1,5 @@
+/// <reference types="@capacitor/push-notifications" />
+
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
@@ -23,6 +25,9 @@ const config: CapacitorConfig = {
       backgroundColor: '#0d6efd',
       launchAutoHide: true,
       showSpinner: false
+    },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert']
     }
   }
 };
