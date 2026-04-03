@@ -464,6 +464,7 @@
 
             <button class="cta-btn" type="submit">Continue</button>
 
+            
             <a class="secondary-btn login-btn" id="loginLink" href="#">
               <span class="secondary-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -489,7 +490,7 @@
 
   <script>
     // ======= DEV server base =======
-   const BASE = "https://www.medisynclabs.ca";
+   const BASE = "http://192.168.1.127:8086";
 
     // Static assets from your Flask server (since dist can't use url_for)
     document.getElementById("logoImg").src = `${BASE}/static/medisync-logo2.png`;
@@ -737,6 +738,98 @@
     to { transform: rotate(360deg); }
   }
 </style>
+<script>
+  async function postTokenToBackend(token) {
+    const res = await fetch(`${BASE}/api/push/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        token: token,
+        platform: 'ios',
+        environment: 'production',
+        app_version: '1.0.0'
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || 'Failed to save push token');
+    }
+
+    return data;
+  }
+
+  async function initPushNotifications() {
+    if (!window.Capacitor || window.Capacitor.getPlatform() !== 'ios') {
+      return;
+    }
+
+    const PushNotifications =
+      window.Capacitor?.Plugins?.PushNotifications ||
+      window.Capacitor?.Plugins?.CapacitorPushNotifications;
+
+    if (!PushNotifications) {
+      console.error('PushNotifications plugin not available.');
+      return;
+    }
+
+    PushNotifications.addListener('registration', async (token) => {
+      console.log('APNs token:', token.value);
+
+      try {
+        await postTokenToBackend(token.value);
+        console.log('Push token saved to backend.');
+      } catch (err) {
+        console.error('Failed to save push token:', err);
+      }
+    });
+
+    PushNotifications.addListener('registrationError', (err) => {
+      console.error('Push registration error:', err);
+    });
+
+    PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      console.log('Push received:', notification);
+    });
+
+    PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+      console.log('Push action performed:', action);
+
+      const deepLink = action.notification?.data?.deep_link;
+      if (deepLink) {
+        window.location.href = deepLink;
+      }
+    });
+
+    let permStatus = await PushNotifications.checkPermissions();
+
+    if (permStatus.receive === 'prompt') {
+      permStatus = await PushNotifications.requestPermissions();
+    }
+
+    if (permStatus.receive !== 'granted') {
+      console.warn('User did not grant push notification permission.');
+      return;
+    }
+
+    await PushNotifications.register();
+  }
+
+  window.initPushNotifications = initPushNotifications;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      initPushNotifications().catch((err) => {
+        console.error('Auto init push failed:', err);
+      });
+    }, 900);
+  });
+</script>
+
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const overlay = document.getElementById('loadingOverlay');
