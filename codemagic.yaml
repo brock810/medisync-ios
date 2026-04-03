@@ -69,8 +69,18 @@ workflows:
       - name: Generate iOS splash/icon assets (logo loader)
         script: |
           set -euo pipefail
-          echo "Temporarily skipping capacitor-assets generate to isolate Assets.xcassets archive failure."
 
+          if [ -d "${ASSET_PATH}" ] && [ -f "${ASSET_PATH}/icon.png" ] && [ -f "${ASSET_PATH}/splash.png" ]; then
+            echo "Generating iOS app icon and splash assets from ${ASSET_PATH}"
+            npx capacitor-assets generate --assetPath "${ASSET_PATH}" --ios
+          else
+            echo "❌ Missing required assets in ${ASSET_PATH}"
+            echo "Expected:"
+            echo "  ${ASSET_PATH}/icon.png"
+            echo "  ${ASSET_PATH}/splash.png"
+            ls -la "${ASSET_PATH}" || true
+            exit 1
+          fi
       - name: Capacitor sync iOS
         script: |
           set -euo pipefail
